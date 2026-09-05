@@ -33,15 +33,22 @@
 ;; =============================================================================
 
 (defn param
-  "Read K from OPTS under its dashed, underscored and string spellings.
+  "Read the first of KS present in OPTS, under dashed, underscored and string
+   spellings of each.
 
-   The MCP surface delivers whichever the caller typed; a source that reads
-   only one of them silently ignores the other two. Presence is decided by
-   `contains?`, never by truthiness: `:same-domain? false` is an answer, and
-   reading it as absence would re-enable the very filter it switches off."
-  [opts k]
-  (let [n          (name k)
-        candidates [k (keyword (str/replace n "-" "_")) n (str/replace n "-" "_")]]
+   Two reasons for the spread. The MCP surface delivers whichever spelling the
+   caller typed. And the served schema names these params `crawl-*` - `max-depth`
+   is already the ingestor's own corpus-classify depth, and contributing that name
+   would REDEFINE it - so a call arrives as :crawl-depth while a REPL caller and
+   this addon's own defaults speak :max-depth.
+
+   Presence is decided by `contains?`, never by truthiness: `:same-domain? false`
+   is an answer, and reading it as absence would re-enable the filter it turns off."
+  [opts & ks]
+  (let [candidates (mapcat (fn [k]
+                             (let [n (name k)]
+                               [k (keyword (str/replace n "-" "_")) n (str/replace n "-" "_")]))
+                           ks)]
     (when-let [hit (first (filter #(contains? opts %) candidates))]
       (get opts hit))))
 
@@ -81,24 +88,25 @@
 (defn ->spec
   "Promote tool params into a validated CrawlSpec. Returns Result<CrawlSpec>.
 
-   :same-domain? defaults to true and only applies when no :link-pattern was
+   :same-domain? defaults to true and only applies when no link pattern was
    given: an explicit pattern is the caller saying they mean it."
   [opts]
-  (let [url          (some-> (or (param opts :url) (param opts :seed-url)) str str/trim not-empty)
-        same-domain? (as-bool (param opts :same-domain?) true)
-        explicit     (some-> (param opts :link-pattern) str str/trim not-empty)
+  (let [url          (some-> (or (param opts :url :seed-url)) str str/trim not-empty)
+        same-domain? (as-bool (param opts :crawl-same-domain :same-domain?) true)
+        explicit     (some-> (param opts :crawl-link-pattern :link-pattern) str str/trim not-empty)
         spec         {:spec/url             (or url "")
-                      :spec/max-depth       (as-int (param opts :max-depth)
+                      :spec/max-depth       (as-int (param opts :crawl-depth :max-depth)
                                                     (:spec/max-depth default-spec))
-                      :spec/max-pages       (as-int (param opts :max-pages)
+                      :spec/max-pages       (as-int (param opts :crawl-pages :max-pages)
                                                     (:spec/max-pages default-spec))
-                      :spec/delay-ms        (as-int (param opts :delay-ms)
+                      :spec/delay-ms        (as-int (param opts :crawl-delay-ms :delay-ms)
                                                     (:spec/delay-ms default-spec))
-                      :spec/respect-robots? (as-bool (param opts :respect-robots?)
+                      :spec/respect-robots? (as-bool (param opts :crawl-robots :respect-robots?)
                                                      (:spec/respect-robots? default-spec))
-                      :spec/user-agent      (or (some-> (param opts :user-agent) str not-empty)
+                      :spec/user-agent      (or (some-> (param opts :crawl-user-agent :user-agent)
+                                                        str not-empty)
                                                 (:spec/user-agent default-spec))
-                      :spec/num-crawlers    (as-int (param opts :num-crawlers)
+                      :spec/num-crawlers    (as-int (param opts :crawl-threads :num-crawlers)
                                                     (:spec/num-crawlers default-spec))
                       :spec/link-pattern    (or explicit
                                                 (when same-domain? (same-host-pattern url)))}]
@@ -197,5 +205,5 @@
    opts."
   ([] (web-crawl-source {}))
   ([opts]
-   (->WebCrawlSource (frontier-for (param opts :frontier))
+   (->WebCrawlSource (frontier-for (param opts :frontier :crawl-frontier))
                      (dissoc opts :frontier))))

@@ -19,21 +19,49 @@
 
 (def source-id "web-crawl")
 
+(def composite-host
+  "Root supertool the ingest command tree composes into. The schema extension
+   must reach the SAME host, or the params are advertised nowhere."
+  "memory")
+
+(def crawl-params
+  "Params contributed to the served schema.
+
+   A parameter absent from the served schema is never delivered to a handler,
+   however the caller spells it - so registering the source is not enough, and
+   `ingest source :source web-crawl :url ...` would arrive with no url at all.
+
+   Named `crawl-*` rather than `max-depth`/`delay-ms`: the host merges an
+   extension OVER its own properties, and `max-depth` is already the ingestor's
+   corpus-classify depth. Contributing that name would silently redefine it."
+  {"url"                {:type "string"
+                        :description "[source web-crawl] Seed URL to crawl (required)"}
+   "crawl-depth"        {:type "integer"
+                        :description "[source web-crawl] Link depth to follow from the seed (default 2, max 10)"}
+   "crawl-pages"        {:type "integer"
+                        :description "[source web-crawl] Page cap for the run (default 25)"}
+   "crawl-delay-ms"     {:type "integer"
+                        :description "[source web-crawl] Politeness delay between fetches in ms (default 300). A robots.txt Crawl-delay raises this, never lowers it"}
+   "crawl-robots"       {:type "boolean"
+                        :description "[source web-crawl] Honour robots.txt (default true)"}
+   "crawl-same-domain"  {:type "boolean"
+                        :description "[source web-crawl] Follow only links on the seed's host (default true)"}
+   "crawl-link-pattern" {:type "string"
+                        :description "[source web-crawl] Regex a link must match to be followed; overrides crawl-same-domain"}
+   "crawl-user-agent"   {:type "string"
+                        :description "[source web-crawl] User-Agent sent with every fetch, and matched against robots.txt groups"}
+   "crawl-threads"      {:type "integer"
+                        :description "[source web-crawl] Crawler threads (hive-crawl frontier only, default 2)"}
+   "crawl-frontier"     {:type "string"
+                        :description "[source web-crawl] Which frontier walks the links: 'http' (default) or 'hive-crawl'"}})
+
 (def source-registration
   {:factory     (fn [opts] (source/web-crawl-source opts))
    :description (str "Recursively crawl a site and ingest each page. Depth, page cap, "
-                     "politeness delay and robots.txt are honoured by the crawler; the "
+                     "politeness delay and robots.txt are honoured by the frontier; the "
                      "page HTML is parsed by the host extractor, so headings, lists and "
                      "code blocks survive into the chunks.")
-   :params      {"url"             "seed URL (required)"
-                 "max-depth"       "link depth to follow (default 2, max 10)"
-                 "max-pages"       "page cap for the run (default 25)"
-                 "delay-ms"        "politeness delay between fetches (default 300)"
-                 "respect-robots?" "honour robots.txt (default true)"
-                 "same-domain?"    "restrict to the seed's host (default true)"
-                 "link-pattern"    "explicit regex for links to follow; overrides same-domain?"
-                 "num-crawlers"    "crawler threads (default 2)"
-                 "user-agent"      "user agent string"}})
+   :params      (into {} (map (fn [[k v]] [k (:description v)])) crawl-params)})
 
 (defonce ^:private addon-state (atom nil))
 
@@ -67,14 +95,14 @@
 
   (tools [_] [])
 
-  (schema-extensions [_] {})
+  (schema-extensions [_] {composite-host crawl-params})
 
   (health [_]
     (let [crawler (frontier/frontier-health (frontier/hive-crawl-frontier))]
       (if @addon-state
-        {:status  (if (= :ok (:status crawler)) :ok :degraded)
-         :details {:source source-id :crawler crawler}}
-        {:status :down :details {:source source-id :crawler crawler}})))
+        {:status  :ok
+         :details {:source source-id :hive-crawl crawler}}
+        {:status :down :details {:source source-id :hive-crawl crawler}})))
 
   (excluded-tools [_] #{}))
 
