@@ -146,3 +146,32 @@
 (deftest the-http-frontier-is-the-default
   (is (= "http" (frontier/frontier-id (source/frontier-for nil))))
   (is (= "hive-crawl" (frontier/frontier-id (source/frontier-for "hive-crawl")))))
+
+(def ^:private chrome-web
+  {"https://example.com/seed"
+   (str "<html><head><title>Seed</title></head><body>"
+        "<nav><a href='/nav-only'>Everything else</a></nav>"
+        "<p>The claim, which cites <a href='/cited'>this</a>.</p>"
+        "<footer><a href='/footer-only'>Colophon</a></footer>"
+        "</body></html>")
+   "https://example.com/cited"       (page "Cited")
+   "https://example.com/nav-only"    (page "Nav only")
+   "https://example.com/footer-only" (page "Footer only")})
+
+(deftest a-crawl-follows-what-the-article-cites-not-the-site-chrome
+  (let [{:keys [result]} (crawl {:url "https://example.com/seed" :max-depth 1 :respect-robots? false}
+                                :pages chrome-web)]
+    (is (= #{"https://example.com/seed" "https://example.com/cited"}
+           (set (mapv :url (:ok result))))
+        "nav and footer links are on every page; following them sweeps the site"))
+
+  (testing "crawl-all-links widens it again, for a docs site whose nav IS the index"
+    (let [{:keys [result]} (crawl {:url "https://example.com/seed" :max-depth 1
+                                   :respect-robots? false :crawl-all-links true}
+                                  :pages chrome-web)]
+      (is (= 4 (count (:ok result))))))
+
+  (testing "the link filter is off when nothing marks a link, so a stale host still crawls"
+    (is (= 1 (count (http-frontier/page-links
+                     "<html><body><p><a href='/x'>x</a></p></body></html>"
+                     "https://example.com/a" nil true))))))

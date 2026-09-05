@@ -46,6 +46,8 @@
                         :description "[source web-crawl] Honour robots.txt (default true)"}
    "crawl-same-domain"  {:type "boolean"
                         :description "[source web-crawl] Follow only links on the seed's host (default true)"}
+   "crawl-all-links"    {:type "boolean"
+                        :description "[source web-crawl] Follow links from the whole page, nav and footer included, instead of only the ones inside the content (default false). True is what a documentation site wants, where the nav IS the index"}
    "crawl-link-pattern" {:type "string"
                         :description "[source web-crawl] Regex a link must match to be followed; overrides crawl-same-domain"}
    "crawl-user-agent"   {:type "string"

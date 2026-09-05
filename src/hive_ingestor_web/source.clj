@@ -19,11 +19,13 @@
   "Defaults for a crawl nobody parameterised.
 
    Deliberately timid: two levels, 25 pages, 300 ms between fetches, robots
-   honoured. A default that is polite is one nobody has to remember to be."
+   honoured, and only the links the article itself makes. A default that is
+   polite is one nobody has to remember to be."
   {:spec/max-depth       2
    :spec/max-pages       25
    :spec/delay-ms        300
    :spec/respect-robots? true
+   :spec/content-links?  true
    :spec/user-agent      "hive-ingestor-web/0.1"
    :spec/num-crawlers    2
    :spec/link-pattern    nil})
@@ -103,6 +105,10 @@
                                                     (:spec/delay-ms default-spec))
                       :spec/respect-robots? (as-bool (param opts :crawl-robots :respect-robots?)
                                                      (:spec/respect-robots? default-spec))
+                      :spec/content-links?  (if-let [all (param opts :crawl-all-links)]
+                                              (not (as-bool all false))
+                                              (as-bool (param opts :content-links?)
+                                                       (:spec/content-links? default-spec)))
                       :spec/user-agent      (or (some-> (param opts :crawl-user-agent :user-agent)
                                                         str not-empty)
                                                 (:spec/user-agent default-spec))

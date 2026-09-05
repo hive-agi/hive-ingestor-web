@@ -125,16 +125,27 @@
 ;; =============================================================================
 
 (defn page-links
-  "Absolute, de-fragmented, pattern-matching links out of HTML at URL."
-  [html url link-pattern]
-  (let [pattern (some-> link-pattern re-pattern)
-        page    (website-parser/parse-page html {:url url})
-        links   (:links (if (r/ok? page) (:ok page) page))]
-    (into []
-          (comp (keep #(absolute-url url (:href %)))
-                (filter #(or (nil? pattern) (re-find pattern %)))
-                (distinct))
-          links)))
+  "Absolute, de-fragmented, pattern-matching links out of HTML at URL.
+
+   CONTENT-ONLY? keeps only the links the extractor also kept as content. A
+   site's nav is on every page, so following it turns `crawl this article and
+   what it cites` into a sweep of the whole site - measured: a depth-1 crawl of
+   one Fowler article reached /boardgames and /videos through the header.
+
+   Links from an extractor that predates `:in-content?` carry no such key and
+   are kept, so a stale host degrades to the old reach rather than to nothing."
+  ([html url link-pattern] (page-links html url link-pattern false))
+  ([html url link-pattern content-only?]
+   (let [pattern (some-> link-pattern re-pattern)
+         page    (website-parser/parse-page html {:url url})
+         links   (:links (if (r/ok? page) (:ok page) page))]
+     (into []
+           (comp (filter (fn [link] (or (not content-only?)
+                                        (get link :in-content? true))))
+                 (keep #(absolute-url url (:href %)))
+                 (filter #(or (nil? pattern) (re-find pattern %)))
+                 (distinct))
+           links))))
 
 ;; =============================================================================
 ;; Boundary
@@ -177,7 +188,7 @@
   (crawl-pages [_ spec]
     (if-let [get-fn (or http-get (resolve-http-get))]
       (let [{:spec/keys [url max-depth max-pages delay-ms user-agent
-                         link-pattern respect-robots?]} spec
+                         link-pattern respect-robots? content-links?]} spec
             sleep  (or sleep-fn #(when (pos? %) (Thread/sleep ^long %)))
             rules  (when respect-robots?
                      (let [res (some->> (robots-url url) (#(fetch-page get-fn % user-agent)))]
@@ -203,7 +214,8 @@
                     keep?    (and ok (textual? (:content-type ok)) (seq (str (:html ok))))
                     page     (when keep? {:url current :html (:html ok) :depth depth})
                     children (when (and keep? (< depth max-depth))
-                               (->> (page-links (:html ok) current link-pattern)
+                               (->> (page-links (:html ok) current link-pattern
+                                                (boolean content-links?))
                                     (remove seen)
                                     (mapv (fn [child] [child (inc depth)]))))]
                 (recur (into (vec rest-queue) children)

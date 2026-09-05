@@ -22,6 +22,7 @@
    [:spec/max-pages       [:int {:min 1 :max 2000}]]
    [:spec/delay-ms        [:int {:min 0 :max 60000}]]
    [:spec/respect-robots? :boolean]
+   [:spec/content-links?  :boolean]
    [:spec/user-agent      NonBlankString]
    [:spec/num-crawlers    [:int {:min 1 :max 16}]]
    [:spec/link-pattern    [:maybe NonBlankString]]])
