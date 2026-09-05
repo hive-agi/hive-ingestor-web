@@ -1,0 +1,6 @@
+{:lib      io.github.hive-agi/hive-ingestor-web
+ :minor    1
+ :license  {:name "Proprietary" :url "https://gitea.hive-mcp.com/hive-agi/hive-ingestor-web"}
+ :scm-url  "https://gitea.hive-mcp.com/hive-agi/hive-ingestor-web"
+ :src-dirs ["src" "resources"]
+ :publish  :none}

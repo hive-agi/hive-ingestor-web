@@ -1,0 +1,186 @@
+(ns hive-ingestor-web.source
+  "The `web-crawl` ISource: a recursive crawl that lands as ingestor Documents.
+
+   Stratified as Collect (params -> CrawlSpec), Pipeline (pages -> Documents)
+   and Boundary (the frontier call). Only `fetch-documents` reaches the network,
+   so everything that decides anything is testable without one."
+  (:require [clojure.string :as str]
+            [hive-dsl.result :as r]
+            [hive-ingestor-web.frontier :as frontier]
+            [hive-ingestor-web.schema :as schema]
+            [hive-ingestor.source.protocol :refer [ISource ISourceHealth]]
+            [hive-ingestor.source.web-docs :as web-docs]
+            [malli.core :as m])
+  (:import [java.net URI]
+           [java.util.regex Pattern]))
+
+(def default-spec
+  "Defaults for a crawl nobody parameterised.
+
+   Deliberately timid: two levels, 25 pages, 300 ms between fetches, robots
+   honoured. A default that is polite is one nobody has to remember to be."
+  {:spec/max-depth       2
+   :spec/max-pages       25
+   :spec/delay-ms        300
+   :spec/respect-robots? true
+   :spec/user-agent      "hive-ingestor-web/0.1"
+   :spec/num-crawlers    2
+   :spec/link-pattern    nil})
+
+;; =============================================================================
+;; Collect - params to CrawlSpec
+;; =============================================================================
+
+(defn param
+  "Read K from OPTS under its dashed, underscored and string spellings.
+
+   The MCP surface delivers whichever the caller typed; a source that reads
+   only one of them silently ignores the other two. Presence is decided by
+   `contains?`, never by truthiness: `:same-domain? false` is an answer, and
+   reading it as absence would re-enable the very filter it switches off."
+  [opts k]
+  (let [n          (name k)
+        candidates [k (keyword (str/replace n "-" "_")) n (str/replace n "-" "_")]]
+    (when-let [hit (first (filter #(contains? opts %) candidates))]
+      (get opts hit))))
+
+(defn as-int
+  "V as an integer, or DEFAULT. Strings count: MCP numbers arrive as text."
+  [v default]
+  (cond
+    (integer? v)                                    v
+    (and (string? v) (re-matches #"\s*-?\d+\s*" v)) (parse-long (str/trim v))
+    :else                                           default))
+
+(defn as-bool
+  "V as a boolean, or DEFAULT when V is absent."
+  [v default]
+  (cond
+    (boolean? v) v
+    (nil? v)     default
+    (string? v)  (contains? #{"true" "yes" "1"} (str/lower-case (str/trim v)))
+    :else        (boolean v)))
+
+(defn url-host
+  "Host of URL, or nil when it does not parse."
+  [url]
+  (try
+    (some-> (URI. (str url)) .getHost not-empty)
+    (catch Exception _ nil)))
+
+(defn same-host-pattern
+  "A link filter admitting only URLs on the same host as URL.
+
+   Returned as a regex STRING because that is what crawler4j's shouldVisit
+   filter takes. Without it a crawl of one article walks the open web."
+  [url]
+  (when-let [host (url-host url)]
+    (str "^https?://" (Pattern/quote host) "([/?#]|$)")))
+
+(defn ->spec
+  "Promote tool params into a validated CrawlSpec. Returns Result<CrawlSpec>.
+
+   :same-domain? defaults to true and only applies when no :link-pattern was
+   given: an explicit pattern is the caller saying they mean it."
+  [opts]
+  (let [url          (some-> (or (param opts :url) (param opts :seed-url)) str str/trim not-empty)
+        same-domain? (as-bool (param opts :same-domain?) true)
+        explicit     (some-> (param opts :link-pattern) str str/trim not-empty)
+        spec         {:spec/url             (or url "")
+                      :spec/max-depth       (as-int (param opts :max-depth)
+                                                    (:spec/max-depth default-spec))
+                      :spec/max-pages       (as-int (param opts :max-pages)
+                                                    (:spec/max-pages default-spec))
+                      :spec/delay-ms        (as-int (param opts :delay-ms)
+                                                    (:spec/delay-ms default-spec))
+                      :spec/respect-robots? (as-bool (param opts :respect-robots?)
+                                                     (:spec/respect-robots? default-spec))
+                      :spec/user-agent      (or (some-> (param opts :user-agent) str not-empty)
+                                                (:spec/user-agent default-spec))
+                      :spec/num-crawlers    (as-int (param opts :num-crawlers)
+                                                    (:spec/num-crawlers default-spec))
+                      :spec/link-pattern    (or explicit
+                                                (when same-domain? (same-host-pattern url)))}]
+    (if-let [explanation (m/explain schema/CrawlSpec spec)]
+      (r/err :source/invalid-config
+             {:reason  "invalid crawl spec"
+              :errors  (mapv (fn [{:keys [in message value]}]
+                               {:in in :message message :value value})
+                             (:errors explanation))
+              :spec    spec})
+      (r/ok spec))))
+
+;; =============================================================================
+;; Pipeline - pages to Documents
+;; =============================================================================
+
+(defn page->document
+  "One crawled page as an ingestor Document. Returns Result<Document>.
+
+   HTML is preferred over the crawler's text dump: the host extractor turns
+   markup into blocks, headings and fenced code, and none of that is
+   recoverable from an already-flattened page."
+  [{:keys [url html text]} opts]
+  (if (str/blank? html)
+    (web-docs/body->document (or text "") {:url url :content-type "text/plain"} opts)
+    (web-docs/body->document html {:url url :content-type "text/html"} opts)))
+
+(defn crawled?
+  "True when PAGE carries anything worth ingesting."
+  [{:keys [html text]}]
+  (not (and (str/blank? html) (str/blank? text))))
+
+(defn distinct-by-url
+  "PAGES with one entry per URL, first occurrence winning.
+
+   A crawler reaches the same page by several paths; ingesting it twice puts
+   two copies of the same chunks in front of the embedder."
+  [pages]
+  (into [] (comp (filter (comp seq str :url))
+                 (dedupe))
+        (vals (reduce (fn [acc page]
+                        (if (contains? acc (:url page))
+                          acc
+                          (assoc acc (:url page) page)))
+                      (array-map)
+                      pages))))
+
+(defn pages->documents
+  "PAGES as Documents, one per distinct URL.
+
+   Pages that carried nothing, and pages the host could not parse, are dropped
+   rather than failing the crawl: one dead page in fifty is not a failed run."
+  [pages opts]
+  (into []
+        (comp (filter crawled?)
+              (map #(page->document % opts))
+              (filter r/ok?)
+              (map :ok))
+        (distinct-by-url pages)))
+
+;; =============================================================================
+;; Boundary - the source
+;; =============================================================================
+
+(defrecord WebCrawlSource [frontier defaults]
+  ISource
+  (source-id [_] "web-crawl")
+
+  (fetch-documents [_ opts]
+    (r/let-ok [spec  (->spec (merge defaults opts))
+               pages (frontier/crawl-pages frontier spec)]
+      (r/ok (pages->documents pages opts))))
+
+  ISourceHealth
+  (source-health [_]
+    (frontier/frontier-health frontier)))
+
+(defn web-crawl-source
+  "Create the `web-crawl` source.
+
+   OPTS may carry :frontier to inject one; otherwise hive-crawl backs it. Every
+   other key is remembered as a default and merged under the per-call opts."
+  ([] (web-crawl-source {}))
+  ([opts]
+   (->WebCrawlSource (or (:frontier opts) (frontier/hive-crawl-frontier))
+                     (dissoc opts :frontier))))

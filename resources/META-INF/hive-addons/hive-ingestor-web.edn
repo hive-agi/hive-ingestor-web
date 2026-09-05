@@ -1,0 +1,9 @@
+{:addon/id           "hive.ingestor-web"
+ :addon/type         :native
+ :addon/version      "0.1.0"
+ :addon/init-ns      "hive-ingestor-web.addon"
+ :addon/init-fn      "addon-ctor"
+ :addon/config       {}
+ :addon/capabilities #{}
+ :addon/dependencies #{"hive.ingestor"}
+ :addon/description  "Recursive web crawl as a hive-ingestor source — reach an article and the pages it links, then ingest each with structure intact"}
