@@ -21,29 +21,50 @@ ingest sources                       # what is registered, and with which params
 | `respect-robots?` | true | honour robots.txt |
 | `same-domain?` | true | restrict to the seed's host |
 | `link-pattern` | — | explicit regex; overrides `same-domain?` |
-| `num-crawlers` | 2 | crawler threads |
+| `num-crawlers` | 2 | crawler threads (hive-crawl frontier only) |
 | `user-agent` | `hive-ingestor-web/0.1` | UA string |
+| `frontier` | `http` | `http`, or `hive-crawl` |
 
 ## Layers
 
 ```
-schema     malli value objects: CrawlSpec (closed), CrawledPage (open)
-frontier   ICrawlFrontier port + the hive-crawl adapter
-source     Collect (params -> spec) | Pipeline (pages -> Documents) | Boundary
-addon      IAddon: register the source on init, retract it on shutdown
+schema          malli value objects: CrawlSpec (closed), CrawledPage (open)
+frontier        ICrawlFrontier port + the hive-crawl adapter
+http-frontier   the default adapter: clj-http, robots.txt, breadth-first
+source          Collect (params -> spec) | Pipeline (pages -> Documents) | Boundary
+addon           IAddon: register the source on init, retract it on shutdown
 ```
 
 Crawling is a crawler's job, so depth, politeness and robots.txt live behind
-`ICrawlFrontier` and `hive-crawl` implements it, on its crawler4j backend —
-the only one of the three that honours robots.txt and surrenders page HTML
-rather than a flattened dump. HTML is what the run is for: the host extractor
-turns markup into blocks, headings and fenced code, and none of that is
-recoverable from text a crawler already flattened.
+`ICrawlFrontier`. Pages are ingested from their **HTML**, never from a text
+dump: the host extractor turns markup into blocks, headings and fenced code,
+and none of that is recoverable from text a crawler already flattened.
+
+### Why the default frontier is plain HTTP
+
+`hive-crawl` is the better crawler — crawler4j gives multi-threaded fetching,
+robots.txt and politeness for free. It cannot be the default here: crawler4j
+4.4.0 resolves **Tika 1.16** and hive-ingestor resolves **Tika 3.3.2**. One
+coordinate, one winner, and with Tika 3 on the classpath crawler4j's parser
+dies on `org.apache.tika.language.LanguageIdentifier` — a class Tika 2 deleted
+— so every crawler thread aborts and the crawl returns zero pages. Measured,
+not inferred: standalone hive-crawl fetched the article fine; the same call
+inside this addon returned `DOCS 0`.
+
+So `http-frontier` does the walking with clj-http, which the ingestor already
+carries: breadth-first, one fetch per distinct URL, robots.txt honoured
+(longest match wins, `Allow` breaks the tie, `Crawl-delay` raises but never
+lowers the configured pause), off-host links never fetched.
+
+`:frontier "hive-crawl"` still selects the other adapter, for a JVM where the
+Tika conflict does not arise. That is what the port is for.
 
 ## Dependencies
 
-`hive-crawl` is unpublished, so it is **absent from `deps.edn`** and arrives
-through an untracked `local.deps.edn`:
+`hive-crawl` is unpublished **and** classpath-incompatible with the host, so it
+is absent from `deps.edn` and optional at runtime; `frontier` resolves it at
+call time and reports `:frontier/unavailable` rather than failing to load.
+To develop against the siblings, use an untracked `local.deps.edn`:
 
 ```clojure
 {:mvn/repos {"oracle" {:url "https://download.oracle.com/maven"}}
@@ -54,9 +75,6 @@ through an untracked `local.deps.edn`:
 
 (The oracle repo is crawler4j's Berkeley DB transitive dependency; a
 `:local/root` dep does not contribute its own `:mvn/repos`.)
-
-`frontier` resolves hive-crawl at call time and reports `:frontier/unavailable`
-rather than failing to load, so this namespace and the suite work without it.
 
 ```
 clj -Sdeps "$(cat local.deps.edn)" -M:test

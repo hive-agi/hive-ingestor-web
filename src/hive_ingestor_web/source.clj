@@ -10,7 +10,8 @@
             [hive-ingestor-web.schema :as schema]
             [hive-ingestor.source.protocol :refer [ISource ISourceHealth]]
             [hive-ingestor.source.web-docs :as web-docs]
-            [malli.core :as m])
+            [malli.core :as m]
+            [hive-ingestor-web.http-frontier :as http-frontier])
   (:import [java.net URI]
            [java.util.regex Pattern]))
 
@@ -175,12 +176,26 @@
   (source-health [_]
     (frontier/frontier-health frontier)))
 
+(defn frontier-for
+  "The frontier named by CHOICE.
+
+   Defaults to the plain-HTTP frontier: hive-crawl's crawler4j engine resolves
+   Tika 1.16 while the ingestor resolves Tika 3, so in one JVM crawler4j's
+   parser dies on a class Tika 2 deleted and every page comes back empty. The
+   port is the point - naming `hive-crawl` still selects it where it is viable."
+  [choice]
+  (cond
+    (satisfies? frontier/ICrawlFrontier choice) choice
+    (contains? #{"hive-crawl" :hive-crawl} choice) (frontier/hive-crawl-frontier)
+    :else (http-frontier/http-frontier)))
+
 (defn web-crawl-source
   "Create the `web-crawl` source.
 
-   OPTS may carry :frontier to inject one; otherwise hive-crawl backs it. Every
-   other key is remembered as a default and merged under the per-call opts."
+   OPTS may carry :frontier - an ICrawlFrontier to inject, or the name of one.
+   Every other key is remembered as a default and merged under the per-call
+   opts."
   ([] (web-crawl-source {}))
   ([opts]
-   (->WebCrawlSource (or (:frontier opts) (frontier/hive-crawl-frontier))
+   (->WebCrawlSource (frontier-for (param opts :frontier))
                      (dissoc opts :frontier))))
