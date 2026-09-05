@@ -15,15 +15,31 @@ ingest sources                       # what is registered, and with which params
 | param | default | meaning |
 |---|---|---|
 | `url` | — | seed URL, required |
-| `max-depth` | 2 | link depth to follow |
-| `max-pages` | 25 | page cap for the run |
-| `delay-ms` | 300 | politeness delay between fetches |
-| `respect-robots?` | true | honour robots.txt |
-| `same-domain?` | true | restrict to the seed's host |
-| `link-pattern` | — | explicit regex; overrides `same-domain?` |
-| `num-crawlers` | 2 | crawler threads (hive-crawl frontier only) |
-| `user-agent` | `hive-ingestor-web/0.1` | UA string |
-| `frontier` | `http` | `http`, or `hive-crawl` |
+| `crawl-depth` | 2 | link depth to follow |
+| `crawl-pages` | 25 | page cap for the run |
+| `crawl-delay-ms` | 300 | politeness delay between fetches |
+| `crawl-robots` | true | honour robots.txt |
+| `crawl-same-domain` | true | restrict to the seed's host |
+| `crawl-all-links` | false | follow nav and footer links too, not only the ones inside the content |
+| `crawl-link-pattern` | — | explicit regex; overrides `crawl-same-domain` |
+| `crawl-threads` | 2 | crawler threads (hive-crawl frontier only) |
+| `crawl-user-agent` | `hive-ingestor-web/0.1` | UA string |
+| `crawl-frontier` | `http` | `http`, or `hive-crawl` |
+
+The params are named `crawl-*` in the served schema because the host merges an
+addon's extension OVER its own properties, and `max-depth` is already the
+ingestor's corpus-classify depth. In the REPL the plain names (`:max-depth`,
+`:delay-ms`, `:same-domain?`) work too.
+
+### What a crawl follows
+
+Only the links the extractor also keeps as content. A site's header links to
+every section of the site from every page, so following whole-page links turns
+"this article and what it cites" into a sweep — measured, a depth-1 crawl of one
+Fowler article ingested 25 pages, most of them /boardgames and /videos. With
+content links only, the same crawl reaches the article and its pattern pages.
+`crawl-all-links true` widens it again, for a documentation site whose nav IS
+the index.
 
 ## Layers
 
