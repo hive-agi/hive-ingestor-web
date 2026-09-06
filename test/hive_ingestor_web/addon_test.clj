@@ -3,16 +3,19 @@
 
    Registering a source is only half the wiring: a param absent from the SERVED
    schema never reaches a handler, and a contributed param that collides with a
-   host one redefines it. Both halves are asserted here."
+   host one redefines it. Both halves are asserted here. The addon no longer
+   resolves the host, so the collision guard is a naming rule the addon can
+   check on its own: every contributed name is `url` or carries the `crawl-`
+   prefix, which no host serves."
   (:require [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [hive-addon.protocol :as proto]
             [hive-ingestor-web.addon :as addon]
-            [hive-ingestor-web.source :as source]
-            [hive-ingestor.addon.registry :as host-registry]))
+            [hive-ingestor-web.source :as source]))
 
-(def ^:private host-properties
-  (get-in host-registry/tool-def [:inputSchema :properties]))
+;; Copyright (C) 2026 Pedro Gomes Branquinho (BuddhiLW) <pedrogbranquinho@gmail.com>
+;;
+;; SPDX-License-Identifier: MIT
 
 (deftest every-contributed-param-declares-a-type-and-a-description
   (doseq [[k v] addon/crawl-params]
@@ -20,11 +23,10 @@
     (is (seq (:description v)) k)
     (is (str/includes? (:description v) "web-crawl") k)))
 
-(deftest no-contributed-param-redefines-a-host-one
-  (testing "the host merges an extension OVER its properties, so a collision is a silent redefinition"
-    (is (empty? (filter (set (keys host-properties)) (keys addon/crawl-params)))
-        (str "colliding: " (pr-str (filter (set (keys host-properties))
-                                           (keys addon/crawl-params)))))))
+(deftest no-contributed-param-can-redefine-a-host-one
+  (testing "the host merges an extension OVER its properties, so every name is namespaced"
+    (doseq [k (keys addon/crawl-params)]
+      (is (or (= "url" k) (str/starts-with? k "crawl-")) k))))
 
 (deftest the-served-names-are-the-names-the-source-reads
   (testing "a call spelled the way the schema advertises reaches the spec"

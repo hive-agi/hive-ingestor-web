@@ -8,7 +8,7 @@
   (:require [hive-addon.protocol :as proto]
             [hive-dsl.result :as r]
             [hive-ingestor-web.source :as source]
-            [hive-ingestor.source.registry :as source-registry]
+            [hive-spi.ingest.registry :as source-registry]
             [taoensso.timbre :as log]
             [hive-ingestor-web.frontier :as frontier]))
 

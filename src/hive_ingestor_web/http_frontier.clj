@@ -11,7 +11,7 @@
   (:require [clojure.string :as str]
             [hive-dsl.result :as r]
             [hive-ingestor-web.frontier :as frontier]
-            [hive-ingestor.source.website-parser :as website-parser])
+            [hive-html.page :as website-parser])
   (:import [java.net URI]))
 
 ;; =============================================================================

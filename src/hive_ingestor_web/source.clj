@@ -8,8 +8,8 @@
             [hive-dsl.result :as r]
             [hive-ingestor-web.frontier :as frontier]
             [hive-ingestor-web.schema :as schema]
-            [hive-ingestor.source.protocol :refer [ISource ISourceHealth]]
-            [hive-ingestor.source.web-docs :as web-docs]
+            [hive-spi.ingest.ports :refer [ISource ISourceHealth]]
+            [hive-ingest-kit.web-docs :as web-docs]
             [malli.core :as m]
             [hive-ingestor-web.http-frontier :as http-frontier])
   (:import [java.net URI]
@@ -184,7 +184,10 @@
   (fetch-documents [_ opts]
     (r/let-ok [spec  (->spec (merge defaults opts))
                pages (frontier/crawl-pages frontier spec)]
-      (r/ok (pages->documents pages opts))))
+      (let [docs (pages->documents pages opts)]
+        (r/ok (if (pos-int? (:limit opts))
+                (vec (take (:limit opts) docs))
+                docs)))))
 
   ISourceHealth
   (source-health [_]

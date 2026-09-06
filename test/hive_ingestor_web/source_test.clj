@@ -9,7 +9,7 @@
             [hive-ingestor-web.frontier :as frontier]
             [hive-ingestor-web.schema :as schema]
             [hive-ingestor-web.source :as source]
-            [hive-ingestor.source.protocol :as source-proto]
+            [hive-spi.ingest.ports :as source-proto]
             [malli.core :as m]))
 
 (def ^:private article-html

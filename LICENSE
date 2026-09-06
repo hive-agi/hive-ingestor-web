@@ -1,31 +1,21 @@
-Copyright (c) 2026 Pedro Branquinho. All rights reserved.
+MIT License
 
-PROPRIETARY AND CONFIDENTIAL
+Copyright (c) 2026 Pedro Gomes Branquinho (BuddhiLW) <pedrogbranquinho@gmail.com>
 
-This software and its source code, object code, documentation and associated
-materials (the "Software") are the confidential and proprietary property of the
-copyright holder. The Software is licensed, not sold.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-NO LICENSE GRANTED BY DEFAULT
-
-No right to use, copy, modify, merge, publish, distribute, sublicense, create
-derivative works from, reverse engineer, decompile or disassemble the Software
-is granted except under a separate written agreement signed by the copyright
-holder. Absent such an agreement, you may not use the Software for any purpose.
-
-Possession of a copy of the Software, by any means, confers no license.
-
-THIRD-PARTY COMPONENTS
-
-The Software may incorporate or depend upon third-party components distributed
-under their own licenses. Those components remain governed by their respective
-terms, which are unaffected by this notice.
-
-NO WARRANTY
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

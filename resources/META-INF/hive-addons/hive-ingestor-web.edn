@@ -6,8 +6,8 @@
  :addon/config       {}
  :addon/capabilities #{:sources}
  :addon/dependencies #{"hive.ingestor"}
- :addon/description  "Recursive web crawl as a hive-ingestor source — reach an article and the pages it links, then ingest each with structure intact"
- :addon/license      "Proprietary"
+ :addon/description  "Recursive web crawl as an ingestion source — reach an article and the pages it links, then ingest each with structure intact"
+ :addon/license      "MIT"
  :addon/kind         :addon
  :addon/maturity :experimental
- :addon/trust-class :proprietary}
+ :addon/trust-class :foss}
