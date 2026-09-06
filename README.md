@@ -1,10 +1,14 @@
 # hive-ingestor-web
 
-Recursive web ingestion for `hive-ingestor`: reach an article and the pages it
+Recursive web ingestion for a hive pipeline: reach an article and the pages it
 links, and land each one as a Document with its structure intact.
 
-The addon contributes exactly one thing — an `ISource` registered under
-`web-crawl` in the host's source registry. The host already exposes the seam:
+The addon contributes exactly one thing, a `hive-spi.ingest.ports/ISource`
+registered under `web-crawl` in `hive-spi.ingest.registry`. It is written
+against the seam, not the pipeline: `hive-spi` (the ports, the Document, the
+conformance kit), `hive-ingest-kit` (`body->document`) and `hive-html` (the
+page parser) are its whole contract, and none of them is closed. A host that
+consumes the seam already exposes it:
 
 ```
 ingest source :source web-crawl :url https://martinfowler.com/articles/patterns-legacy-displacement/
@@ -85,8 +89,10 @@ To develop against the siblings, use an untracked `local.deps.edn`:
 ```clojure
 {:mvn/repos {"oracle" {:url "https://download.oracle.com/maven"}}
  :deps
- {io.github.hive-agi/hive-crawl    {:local/root "../hive-crawl"}
-  io.github.hive-agi/hive-ingestor {:local/root "../hive-ingestor"}}}
+ {io.github.hive-agi/hive-crawl      {:local/root "../hive-crawl"}
+  io.github.hive-agi/hive-spi        {:local/root "../hive-spi"}
+  io.github.hive-agi/hive-html       {:local/root "../hive-html"}
+  io.github.hive-agi/hive-ingest-kit {:local/root "../hive-ingest-kit"}}}
 ```
 
 (The oracle repo is crawler4j's Berkeley DB transitive dependency; a
@@ -96,9 +102,12 @@ To develop against the siblings, use an untracked `local.deps.edn`:
 clj -Sdeps "$(cat local.deps.edn)" -M:test
 ```
 
-## Status
+## Conformance
 
-The structure-preserving extraction this addon feeds landed in `hive-ingestor`
-after `0.2.151`. Until the host publishes, four tests in `source_test` — the
-ones asserting markdown headings and the `:content/article` kind — pass only
-with the `local.deps.edn` override above.
+`test/hive_ingestor_web/tck_test.clj` runs the source through
+`hive-spi.ingest.tck` with a fake frontier, so the suite proves the contract
+at both rungs (descriptor and behaviour) without a network.
+
+## License
+
+MIT.
