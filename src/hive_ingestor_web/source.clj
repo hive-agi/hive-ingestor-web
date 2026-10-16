@@ -15,6 +15,15 @@
   (:import [java.net URI]
            [java.util.regex Pattern]))
 
+(def default-user-agent
+  "Browser-compatible User-Agent that still names the crawler.
+
+   Some origins (www.planalto.gov.br) drop the connection outright for a bare
+   bot token such as \"hive-ingestor-web/0.1\" - no status, no bytes - while
+   answering 200 to anything starting \"Mozilla/5.0\". The product token after
+   `compatible;` keeps robots.txt group matching on `hive-ingestor-web`."
+  "Mozilla/5.0 (compatible; hive-ingestor-web/0.1; +https://github.com/hive-agi/hive-ingestor-web)")
+
 (def default-spec
   "Defaults for a crawl nobody parameterised.
 
@@ -26,7 +35,7 @@
    :spec/delay-ms        300
    :spec/respect-robots? true
    :spec/content-links?  true
-   :spec/user-agent      "hive-ingestor-web/0.1"
+   :spec/user-agent      default-user-agent
    :spec/num-crawlers    2
    :spec/link-pattern    nil})
 

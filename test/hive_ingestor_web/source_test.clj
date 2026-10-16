@@ -27,6 +27,19 @@
   frontier/IFrontierHealth
   (frontier-health [_] {:status :ok :details {:backend "fake"}}))
 
+(deftest default-user-agent-is-browser-compatible
+  (testing "origins that drop bare bot tokens get a Mozilla/5.0 UA"
+    (is (str/starts-with? source/default-user-agent "Mozilla/5.0"))
+    (is (= source/default-user-agent (:spec/user-agent source/default-spec))))
+  (testing "the crawler still names itself, so robots.txt groups still match"
+    (is (str/includes? source/default-user-agent "hive-ingestor-web")))
+  (testing "an explicit user agent still wins"
+    (is (= "custom/1.0" (:spec/user-agent (:ok (source/->spec {:url "https://example.com"
+                                                                :crawl-user-agent "custom/1.0"}))))))
+  (testing "an unparameterised spec carries the default"
+    (is (= source/default-user-agent
+           (:spec/user-agent (:ok (source/->spec {:url "https://example.com"})))))))
+
 (defn- fake-frontier
   ([pages] (fake-frontier pages (atom [])))
   ([pages seen] (->FakeFrontier pages seen)))
